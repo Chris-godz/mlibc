@@ -1,0 +1,188 @@
+name: qemu-hello
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+    contents: read
+
+jobs:
+#   build-qemu:    
+    # name: Build QEMU
+    # steps:
+    #   - name: Cache QEMU
+    #     uses: actions/cache/restore@v4
+    #     id: cache-qemu
+    #     with:
+    #       path:              
+    #         /usr/local/bin/qemu-*
+    #         /usr/local/share/qemu/**
+    #       key: qemu-9.2.2-${{ runner.os }}
+
+    #   - name: Install Qemu
+    #     if: steps.cache-qemu.outputs.cache-hit != 'true'
+    #     shell: bash
+    #     run: |
+    #       wget https://download.qemu.org/qemu-9.2.2.tar.xz
+    #       tar xvJf qemu-9.2.2.tar.xz
+    #       cd qemu-9.2.2
+    #       ./configure
+    #       make -j$(nproc)
+    #       sudo make install
+    #       qemu-system-arm --version
+      
+    #   # 保存刚安装的 QEMU 到缓存 - 这是关键步骤
+    #   - name: Save QEMU to cache
+    #     if: steps.cache-qemu.outputs.cache-hit != 'true'
+    #     uses: actions/cache/save@v4
+    #     with:
+    #       path: |
+    #         /usr/local/bin/qemu-*
+    #         /usr/local/share/qemu/**
+    #       key: qemu-9.2.2-${{ runner.os }}
+
+  test:
+    # needs: build-qemu  # 依赖于 QEMU 构建任务
+    runs-on: ubuntu-latest
+    name: ${{ matrix.platform.QEMU_HELLO }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - { QEMU_BOARD: "qemu-mps3-an536"  , ARCH: "arm" , QEMU_HELLO: "qemu-hello run on qemu-mps3-an536"}
+          - { QEMU_BOARD: "qemu-vexpress-a9" , ARCH: "arm" , QEMU_HELLO: "qemu-hello run on qemu-vexpress-a9"}
+          - { QEMU_BOARD: "qemu-virt-aarch64", ARCH: "aarch64" , QEMU_HELLO: "qemu-hello run on qemu-virt-aarch64"}
+          - { QEMU_BOARD: "qemu-virt-riscv32", ARCH: "riscv32" , QEMU_HELLO: "qemu-hello run on qemu-virt-riscv32"}
+          - { QEMU_BOARD: "qemu-virt-riscv64", ARCH: "riscv64" , QEMU_HELLO: "qemu-hello run on qemu-virt-riscv64"}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up QEMU
+        run: |
+          wget https://download.qemu.org/qemu-9.2.2.tar.xz
+          tar xvJf qemu-9.2.2.tar.xz
+          cd qemu-9.2.2
+          ./configure
+          make -j$(nproc)
+          sudo make install
+      # 恢复缓存的 QEMU
+      # - name: Restore QEMU from cache
+      #   uses: actions/cache@v4
+      #   id: cache-qemu
+      #   with:
+      #     path: | 
+      #       /usr/local/bin/qemu-*
+      #       /usr/local/share/qemu/**
+             
+      #     key: qemu-9.2.2-${{ runner.os }}
+          
+      - name: Verify QEMU installation
+        shell: bash
+        run: |
+          qemu-system-arm --version
+
+      - name: Install Arm ToolChains
+        if: ${{ matrix.platform.ARCH == 'arm'}}
+        shell: bash
+        run: |
+           wget -q https://github.com/RT-Thread/toolchains-ci/releases/download/v1.3/gcc-arm-none-eabi-10-2020-q4-major-x86_64-linux.tar.bz2
+           sudo tar xjf gcc-arm-none-eabi-10-2020-q4-major-x86_64-linux.tar.bz2 -C /opt
+           /opt/gcc-arm-none-eabi-10-2020-q4-major/bin/arm-none-eabi-gcc --version
+           echo "MLIBC_TOOLCHAIN_CC=/opt/gcc-arm-none-eabi-10-2020-q4-major/bin/arm-none-eabi-gcc" >> $GITHUB_ENV
+           echo "MLIBC_TOOLCHAIN_AR=/opt/gcc-arm-none-eabi-10-2020-q4-major/bin/arm-none-eabi-gcc-ar" >> $GITHUB_ENV
+
+      - name: Install AArch64 ToolChains
+        if: ${{ matrix.platform.ARCH == 'aarch64'}}
+        shell: bash
+        run: |
+           wget -q https://github.com/RT-Thread/toolchains-ci/releases/download/v1.6/gcc-arm-10.2-2020.11-x86_64-aarch64-none-elf.tar.xz
+           sudo tar -xf gcc-arm-10.2-2020.11-x86_64-aarch64-none-elf.tar.xz -C /opt
+           /opt/gcc-arm-10.2-2020.11-x86_64-aarch64-none-elf/bin/aarch64-none-elf-gcc --version
+           echo "MLIBC_TOOLCHAIN_CC=/opt/gcc-arm-10.2-2020.11-x86_64-aarch64-none-elf/bin/aarch64-none-elf-gcc" >> $GITHUB_ENV
+           echo "MLIBC_TOOLCHAIN_AR=/opt/gcc-arm-10.2-2020.11-x86_64-aarch64-none-elf/bin/aarch64-none-elf-ar" >> $GITHUB_ENV
+
+      - name: Install RV32 ToolChains
+        if: ${{ matrix.platform.ARCH == 'riscv32'}}
+        shell: bash
+        run: |
+           wget -q https://github.com/hpmicro/riscv-gnu-toolchain/releases/download/2022.05.15/riscv32-unknown-elf-newlib-multilib_2022.05.15_linux.tar.gz
+           sudo tar zxf riscv32-unknown-elf-newlib-multilib_2022.05.15_linux.tar.gz -C /opt
+           /opt/riscv32-unknown-elf-newlib-multilib/bin/riscv32-unknown-elf-gcc --version
+           echo "MLIBC_TOOLCHAIN_CC=/opt/riscv32-unknown-elf-newlib-multilib/bin/riscv32-unknown-elf-gcc" >> $GITHUB_ENV
+           echo "MLIBC_TOOLCHAIN_AR=/opt/riscv32-unknown-elf-newlib-multilib/bin/riscv32-unknown-elf-ar" >> $GITHUB_ENV
+
+      - name: Install RV64 ToolChains
+        if: ${{ matrix.platform.ARCH == 'riscv64'}}
+        shell: bash
+        run: |
+           wget -q https://github.com/RT-Thread/toolchains-ci/releases/download/v1.4/riscv64-unknown-elf-toolchain-10.2.0-2020.12.8-x86_64-linux-ubuntu14.tar.gz
+           sudo tar zxf riscv64-unknown-elf-toolchain-10.2.0-2020.12.8-x86_64-linux-ubuntu14.tar.gz -C /opt
+           /opt/riscv64-unknown-elf-toolchain-10.2.0-2020.12.8-x86_64-linux-ubuntu14/bin/riscv64-unknown-elf-gcc --version
+           echo "MLIBC_TOOLCHAIN_CC=/opt/riscv64-unknown-elf-toolchain-10.2.0-2020.12.8-x86_64-linux-ubuntu14/bin/riscv64-unknown-elf-gcc" >> $GITHUB_ENV
+           echo "MLIBC_TOOLCHAIN_AR=/opt/riscv64-unknown-elf-toolchain-10.2.0-2020.12.8-x86_64-linux-ubuntu14/bin/riscv64-unknown-elf-ar" >> $GITHUB_ENV
+
+      - name: qemu-hello test
+        shell: bash
+        if: ${{ env.MLIBC_TOOLCHAIN_AR != '' && success() }}
+        env:
+            ARCH : ${{ matrix.platform.ARCH }}
+            QEMU_BOARD : ${{ matrix.platform.QEMU_BOARD }}
+        run: |
+          if [[ "${{ matrix.platform.QEMU_BOARD }}"  == "qemu-mps3-an536" ]]; then
+            make qemu-hello
+            qemu-system-arm -M mps3-an536 \
+            -kernel ./helloworld/qemu/${{ matrix.platform.QEMU_BOARD }}/${{ matrix.platform.QEMU_BOARD }}.elf \
+            -nographic -m 512 &
+            pid=$!
+            echo "QEMU 进程 ID: $pid"
+            sleep 5
+            kill -9 $pid || true
+            echo "QEMU 进程已终止"
+
+          elif [[ "${{ matrix.platform.QEMU_BOARD }}"  == "qemu-vexpress-a9" ]]; then 
+            make qemu-hello
+            qemu-system-arm -M vexpress-a9 \
+            -kernel ./helloworld/qemu/${{ matrix.platform.QEMU_BOARD }}/${{ matrix.platform.QEMU_BOARD }}.elf \
+            -nographic -m 512 &
+            pid=$!
+            echo "QEMU 进程 ID: $pid"
+            sleep 5
+            kill -9 $pid || true
+            echo "QEMU 进程已终止"
+
+          elif [[ "${{ matrix.platform.QEMU_BOARD }}"  == "qemu-virt-aarch64" ]]; then 
+            make qemu-hello
+            qemu-system-aarch64 -M virt \
+            -cpu cortex-a53 \
+            -kernel ./helloworld/qemu/${{ matrix.platform.QEMU_BOARD }}/${{ matrix.platform.QEMU_BOARD }}.elf \
+            -nographic -m 512 &
+            pid=$!
+            echo "QEMU 进程 ID: $pid"
+            sleep 5
+            kill -9 $pid || true
+            echo "QEMU 进程已终止"
+
+          elif [[ "${{ matrix.platform.QEMU_BOARD }}"  == "qemu-virt-riscv32" ]]; then
+            make qemu-hello
+            qemu-system-riscv32 -machine virt \
+            -nographic -m 256M \
+            -kernel ./helloworld/qemu/${{ matrix.platform.QEMU_BOARD }}/${{ matrix.platform.QEMU_BOARD }}.elf &
+            pid=$!
+            echo "QEMU 进程 ID: $pid"
+            sleep 5
+            kill -9 $pid || true
+            echo "QEMU 进程已终止"
+
+          elif [[ "${{ matrix.platform.QEMU_BOARD }}"  == "qemu-virt-riscv64" ]]; then
+            make qemu-hello
+            qemu-system-riscv64 -machine virt \
+            -nographic -m 512M \
+            -kernel ./helloworld/qemu/${{ matrix.platform.QEMU_BOARD }}/${{ matrix.platform.QEMU_BOARD }}.elf &
+            pid=$!
+            echo "QEMU 进程 ID: $pid"
+            sleep 5
+            kill -9 $pid || true
+            echo "QEMU 进程已终止"
+          fi

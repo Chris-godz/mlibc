@@ -39,10 +39,5 @@ int main(int argc, char **argv)
     }
 
     printf("Hello mlibc\n");
-    while(1)
-    {
-        
-    }
-
     return 0;
 }

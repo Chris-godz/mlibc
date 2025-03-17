@@ -1,5 +1,5 @@
-DEFINE = -D__UNDEF_FFS__
-DEVICE = -mcmodel=medany -mstrict-align
+DEFINE = 
+DEVICE = -mcmodel=medany -mstrict-align  -march=rv32imac -mabi=ilp32
 DEBUG  = -gdwarf-2
 QCFLAGS = -O0
 ASFLAGS = 
