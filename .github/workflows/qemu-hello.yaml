@@ -46,7 +46,7 @@ jobs:
 
   test:
     # needs: build-qemu  # 依赖于 QEMU 构建任务
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     name: ${{ matrix.platform.QEMU_HELLO }}
     strategy:
       fail-fast: false
